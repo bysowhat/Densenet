@@ -56,20 +56,96 @@ def densenet_arg_scope(weight_decay=0.0005):
     An arg_scope.
   """
   with slim.arg_scope([slim.conv2d, slim.fully_connected],
-                      activation_fn=tf.nn.relu,
                       weights_regularizer=slim.l2_regularizer(weight_decay),
                       biases_initializer=tf.zeros_initializer()):
     with slim.arg_scope([slim.conv2d], padding='SAME') as arg_sc:
       return arg_sc
 
+def composite_function(_input, out_features, is_training = True, dropout_keep_prob = 0.8, kernel_size = [3,3]):
+    """Function from paper H_l that performs:
+    - batch normalization
+    - ReLU nonlinearity
+    - convolution with required kernel
+    - dropout, if required
+    """
+    with tf.variable_scope("composite_function"):
+        # BN
+        output = slim.batch_norm(_input, is_training=is_training)#!!need op
+        # ReLU
+        output = tf.nn.relu(output)
+        # convolution
+        output = slim.conv2d(output, out_features, kernel_size)
+        # dropout(in case of training and in case it is no 1.0)
+        if is_training:
+            output = slim.dropout(output, dropout_keep_prob)
+    return output
 
+def bottleneck(_input, out_features, is_training = True, dropout_keep_prob = 0.8, kernel_size = [1,1]):
+    with tf.variable_scope("bottleneck"):
+        output = slim.batch_norm(_input, is_training=is_training)
+        output = tf.nn.relu(output)
+        inter_features = out_features * 4
+        output = slim.conv2d(output, inter_features, kernel_size, padding='VALID')
+        if is_training:
+            output = slim.dropout(output, dropout_keep_prob)
+    return output
+       
+def add_internal_layer(_input, growth_rate, bc_mode):
+        """Perform H_l composite function for the layer and after concatenate
+        input with output from composite function.
+        """
+        # call composite function with 3x3 kernel
+        if not bc_mode:
+            comp_out = composite_function(
+                _input, out_features=growth_rate, kernel_size=3)
+        elif bc_mode:
+            bottleneck_out = bottleneck(_input, out_features=growth_rate)
+            comp_out = composite_function(
+                bottleneck_out, out_features=growth_rate, kernel_size=3)
+        
+        # concatenate _input with out from composite function
+        # the only diffenence between resnet and densenet
+        output = tf.concat(axis=3, values=(_input, comp_out))
+
+def transition_layer(_input, is_training = True, dropout_keep_prob = 1.0, reduction = 1.0):
+    """Call H_l composite function with 1x1 kernel and after average
+    pooling
+    """
+    # call composite function with 1x1 kernel
+    out_features = int(int(_input.get_shape()[-1]) * reduction)
+    output = composite_function(#!! need dropout??
+        _input, out_features, is_training, dropout_keep_prob, kernel_size=[1,1])
+    # run average pooling
+    output = slim.avg_pool2d(output, [2,2])
+    return output        
+
+def trainsition_layer_to_classes(_input, n_classes = 1001, is_training = True):
+        """This is last transition to get probabilities by classes. It perform:
+        - batch normalization
+        - ReLU nonlinearity
+        - wide average pooling
+        - FC layer multiplication
+        """
+        # BN
+        output = output = slim.batch_norm(_input, is_training=is_training)
+        # ReLU
+        output = tf.nn.relu(output)
+        # average pooling
+        last_pool_kernel = int(output.get_shape()[-2])
+        output = slim.avg_pool2d(output, [last_pool_kernel, last_pool_kernel])
+        # FC
+        logits = slim.fully_connected(output, n_classes, activation_fn = None, normalizer_fn = None)
+        return logits
+        
 def densenet_40(inputs,
-          num_classes=1000,
-          is_training=True,
-          dropout_keep_prob=0.5,
-          spatial_squeeze=True,
-          scope='vgg_a',
-          fc_conv_padding='VALID'):
+            first_output_features,
+            layers_per_block,
+            growth_rate,
+            num_classes=1001,
+            is_training=True,
+            dropout_keep_prob=0.8,
+            scope='densenet_40',
+            fc_conv_padding='VALID'):
   """Oxford Net VGG 11-Layers version A Example.
 
   Note: All the fully_connected layers have been transformed to conv2d layers.
@@ -94,11 +170,45 @@ def densenet_40(inputs,
   Returns:
     the last op containing the log predictions and end_points dict.
   """
-  with tf.variable_scope(scope, 'vgg_a', [inputs]) as sc:
-    end_points_collection = sc.name + '_end_points'
+  with tf.variable_scope(scope, 'densenet_40', [inputs]) as sc:
     # Collect outputs for conv2d, fully_connected and max_pool2d.
-    with slim.arg_scope([slim.conv2d, slim.max_pool2d],
-                        outputs_collections=end_points_collection):
+    end_points = {}
+    with slim.arg_scope([slim.conv2d, slim.max_pool2d]):
+        
+        #first conv
+        net = slim.conv2d(inputs, first_output_features, [3,3])
+        end_points['conv1'] = net
+        
+        #block1
+        with tf.variable_scope("Block_1"):
+            for layer in range(layers_per_block):
+                with tf.variable_scope("layer_%d" % layer):
+                    net = add_internal_layer(net, growth_rate)
+            with tf.variable_scope("Transition_after_block_1"):
+                    net = transition_layer(net)
+        end_points['block1'] = net
+        
+        #block2
+        with tf.variable_scope("Block_2"):
+            for layer in range(layers_per_block):
+                with tf.variable_scope("layer_%d" % layer):
+                    net = add_internal_layer(net, growth_rate)
+            with tf.variable_scope("Transition_after_block_2"):
+                    net = transition_layer(net)
+        end_points['block2'] = net
+                    
+        #block3
+        with tf.variable_scope("Block_3"):
+            for layer in range(layers_per_block):
+                with tf.variable_scope("layer_%d" % layer):
+                    net = add_internal_layer(net, growth_rate)
+            with tf.variable_scope("trainsition_layer_to_classes"):
+                net = trainsition_layer_to_classes(net, num_classes)
+        end_points['block3'] = net
+        
+        prediction = tf.nn.softmax(logits)
+    
+    
       net = slim.repeat(inputs, 1, slim.conv2d, 64, [3, 3], scope='conv1')
       net = slim.max_pool2d(net, [2, 2], scope='pool1')
       net = slim.repeat(net, 1, slim.conv2d, 128, [3, 3], scope='conv2')
