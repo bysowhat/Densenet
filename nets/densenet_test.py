@@ -26,20 +26,19 @@ slim = tf.contrib.slim
 
 class DensenetTest(tf.test.TestCase):
 
-#     def testBuild(self):
-#         batch_size = 5
-#         height, width = 32, 32
-#         num_classes = 10
-#         first_output_features = 24
-#         layers_per_block = 12
-#         growth_rate = 12
-#         with self.test_session():
-#             inputs = tf.random_uniform((batch_size, height, width, 3))
-#             logits, _ = densenet.densenet_40(inputs, first_output_features, layers_per_block, growth_rate)
-#             self.assertEquals(logits.op.name, 'densenet_40/Softmax')
-#             self.assertListEqual(logits.get_shape().as_list(),
-#                                  [batch_size, num_classes])
-            
+    def testBuild(self):
+        batch_size = 5
+        height, width = 32, 32
+        num_classes = 10
+        first_output_features = 24
+        layers_per_block = 12
+        growth_rate = 12
+        with self.test_session():
+            inputs = tf.random_uniform((batch_size, height, width, 3))
+            logits, _ = densenet.densenet_40(inputs, first_output_features, layers_per_block, growth_rate)
+            self.assertEquals(logits.op.name, 'densenet_40/Softmax')
+            self.assertListEqual(logits.get_shape().as_list(),
+                                 [batch_size, num_classes])
  
     def testEndPoints(self):
         batch_size = 5
@@ -95,6 +94,7 @@ class DensenetTest(tf.test.TestCase):
                               'densenet_40/block_3/trainsition_layer_to_classes/AvgPool2D', 
                               'densenet_40/block_3/trainsition_layer_to_classes/fully_connected']
             self.assertSetEqual(set(end_points.keys()), set(expected_names))
+
 
 if __name__ == '__main__':
   tf.test.main()

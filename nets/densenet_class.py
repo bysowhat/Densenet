@@ -282,6 +282,19 @@ def densenet_40(inputs,
             return prediction, end_points
 
 
+def densenet_losses(logits, 
+                    gclasses,
+                    device='/cpu:0',
+                    scope=None):
+    with tf.name_scope(scope, 'densenet_losses'):
+        # Add cross-entropy loss.
+        with tf.name_scope('cross_entropy'):
+            loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
+                                                                  labels=gclasses)
+            loss = tf.div(tf.reduce_sum(loss), batch_size, name='value')
+            tf.losses.add_loss(loss)
+
+
 
  
 
