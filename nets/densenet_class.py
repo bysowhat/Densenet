@@ -156,11 +156,12 @@ def bottleneck(_input, out_features, training = True, dropout_keep_prob = 0.8):
             output = slim.dropout(output, dropout_keep_prob)
     return output
        
-def add_internal_layer(_input, growth_rate, training = True, bc_mode = False, dropout_keep_prob = 1.0):
-        """Perform H_l composite function for the layer and after concatenate
-        input with output from composite function.
-        """
-        # call composite function with 3x3 kernel
+def add_internal_layer(_input, growth_rate, training = True, bc_mode = False, dropout_keep_prob = 1.0, scope="inner_layer"):
+    """Perform H_l composite function for the layer and after concatenate
+    input with output from composite function.
+    """
+    # call composite function with 3x3 kernel
+    with tf.variable_scope(scope):
         if not bc_mode:
             _output = composite_function(_input, growth_rate, training)
             if training:
@@ -239,48 +240,46 @@ def densenet_40(inputs,
     """
     nchannels = first_output_features
     with tf.variable_scope(scope, 'densenet_40', [inputs]) as sc:
-        # Collect outputs for conv2d, fully_connected and max_pool2d.
-        end_points = {}
-        #first conv
-        net = slim.conv2d(inputs, first_output_features, [3,3], scope="conv1")
-        end_points['conv1'] = net
-        
-        #block1
-        with tf.variable_scope("Block_1"):
-            for layer in range(layers_per_block):
-                with tf.variable_scope("layer_%d" % layer):
-                    net = add_internal_layer(net, growth_rate, is_training, bc_mode, dropout_keep_prob)
-                    nchannels += growth_rate
-            with tf.variable_scope("Transition_1"):
+        end_points_collection = sc.name + '_end_points'
+        with slim.arg_scope([slim.conv2d, slim.avg_pool2d, slim.fully_connected],
+                        outputs_collections=end_points_collection):
+            #first conv
+            with tf.variable_scope("first_conv"):
+                net = slim.conv2d(inputs, first_output_features, [3,3])
+            
+            #block1
+            with tf.variable_scope("block_1"):
+                net = slim.repeat(net, layers_per_block, add_internal_layer, 
+                                  growth_rate, is_training, bc_mode, dropout_keep_prob)
+                nchannels += growth_rate*layers_per_block
+                with tf.variable_scope("transition_1"):
                     net = transition_layer(net, nchannels, is_training)
-        end_points['block1'] = net
-        
-        #block2
-        with tf.variable_scope("Block_2"):
-            for layer in range(layers_per_block):
-                with tf.variable_scope("layer_%d" % layer):
-                    net = add_internal_layer(net, growth_rate, is_training, bc_mode, dropout_keep_prob)
-                    nchannels += growth_rate
-            with tf.variable_scope("Transition_2"):
+            
+            #block2
+            with tf.variable_scope("block_2"):
+                net = slim.repeat(net, layers_per_block, add_internal_layer, 
+                                  growth_rate, is_training, bc_mode, dropout_keep_prob)
+                nchannels += growth_rate*layers_per_block
+                with tf.variable_scope("transition_2"):
                     net = transition_layer(net, nchannels, is_training)
-        end_points['block2'] = net
-        
-        #block3
-        with tf.variable_scope("Block_3"):
-            for layer in range(layers_per_block):
-                with tf.variable_scope("layer_%d" % layer):
-                    net = add_internal_layer(net, growth_rate, is_training, bc_mode, dropout_keep_prob)
-                    nchannels += growth_rate
-                    
-            with tf.variable_scope("trainsition_layer_to_classes"):
-                net = trainsition_layer_to_classes(net, num_classes, is_training)
-        end_points['block3'] = net
-        
-        #softmax
-        net = tf.reshape(net, [-1,num_classes])
-        prediction = tf.nn.softmax(net)
-        
-        return prediction, end_points
+            
+            #block3
+            with tf.variable_scope("block_3"):
+                net = slim.repeat(net, layers_per_block, add_internal_layer, 
+                                  growth_rate, is_training, bc_mode, dropout_keep_prob)
+                nchannels += growth_rate*layers_per_block
+                assert(nchannels == net.shape[-1])
+                with tf.variable_scope("trainsition_layer_to_classes"):
+                    net = trainsition_layer_to_classes(net, num_classes, is_training)
+            
+            
+            #softmax
+            net = tf.reshape(net, [-1,num_classes])
+            prediction = tf.nn.softmax(net)
+            
+            # Convert end_points_collection into a end_point dict.
+            end_points = slim.utils.convert_collection_to_dict(end_points_collection)
+            return prediction, end_points
 
 
 

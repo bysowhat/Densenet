@@ -26,22 +26,75 @@ slim = tf.contrib.slim
 
 class DensenetTest(tf.test.TestCase):
 
-  def testBuild(self):
-    batch_size = 5
-    height, width = 32, 32
-    num_classes = 10
-    first_output_features = 4
-    layers_per_block = 12
-    growth_rate = 12
-    with self.test_session():
-      inputs = tf.random_uniform((batch_size, height, width, 3))
-      logits, _ = densenet.densenet_40(inputs, first_output_features, layers_per_block, growth_rate)
-      self.assertEquals(logits.op.name, 'densenet_40/Softmax')
-      self.assertListEqual(logits.get_shape().as_list(),
-                           [batch_size, num_classes])
-
+#     def testBuild(self):
+#         batch_size = 5
+#         height, width = 32, 32
+#         num_classes = 10
+#         first_output_features = 24
+#         layers_per_block = 12
+#         growth_rate = 12
+#         with self.test_session():
+#             inputs = tf.random_uniform((batch_size, height, width, 3))
+#             logits, _ = densenet.densenet_40(inputs, first_output_features, layers_per_block, growth_rate)
+#             self.assertEquals(logits.op.name, 'densenet_40/Softmax')
+#             self.assertListEqual(logits.get_shape().as_list(),
+#                                  [batch_size, num_classes])
+            
  
-
+    def testEndPoints(self):
+        batch_size = 5
+        height, width = 32, 32
+        num_classes = 10
+        first_output_features = 24
+        layers_per_block = 12
+        growth_rate = 12
+        with self.test_session():
+            inputs = tf.random_uniform((batch_size, height, width, 3))
+            _, end_points = densenet.densenet_40(inputs, first_output_features, layers_per_block, growth_rate)
+            expected_names = ['densenet_40/first_conv/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_1/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_2/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_3/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_4/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_5/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_6/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_7/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_8/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_9/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_10/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_11/composite_function/Conv', 
+                              'densenet_40/block_1/Repeat/add_internal_layer_12/composite_function/Conv', 
+                              'densenet_40/block_1/transition_1/composite_function/Conv', 
+                              'densenet_40/block_1/transition_1/AvgPool2D', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_1/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_2/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_3/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_4/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_5/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_6/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_7/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_8/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_9/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_10/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_11/composite_function/Conv', 
+                              'densenet_40/block_2/Repeat/add_internal_layer_12/composite_function/Conv', 
+                              'densenet_40/block_2/transition_2/composite_function/Conv', 
+                              'densenet_40/block_2/transition_2/AvgPool2D', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_1/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_2/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_3/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_4/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_5/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_6/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_7/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_8/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_9/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_10/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_11/composite_function/Conv', 
+                              'densenet_40/block_3/Repeat/add_internal_layer_12/composite_function/Conv', 
+                              'densenet_40/block_3/trainsition_layer_to_classes/AvgPool2D', 
+                              'densenet_40/block_3/trainsition_layer_to_classes/fully_connected']
+            self.assertSetEqual(set(end_points.keys()), set(expected_names))
 
 if __name__ == '__main__':
   tf.test.main()
