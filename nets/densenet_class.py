@@ -62,7 +62,7 @@ class DENSENet(object):
     """
     default_params = DensenetParams(
         num_classes = 10,
-        first_output_features = 4,
+        first_output_features = 24,
         layers_per_block = 12,
         growth_rate = 12,
         bc_mode = False,
@@ -127,7 +127,7 @@ def densenet_arg_scope(weight_decay=0.0004, is_training = True, data_format='NHW
             return sc
             
 
-def composite_function(_input, out_features, is_training = True, dropout_keep_prob = 0.8, kernel_size = [3,3]):
+def composite_function(_input, out_features, training = True, dropout_keep_prob = 0.8, kernel_size = [3,3]):
     """Function from paper H_l that performs:
     - batch normalization
     - ReLU nonlinearity
@@ -136,76 +136,76 @@ def composite_function(_input, out_features, is_training = True, dropout_keep_pr
     """
     with tf.variable_scope("composite_function"):
         # BN
-        output = slim.batch_norm(_input, is_training=is_training)#!!need op
+        output = slim.batch_norm(_input, is_training=training)#!!need op
         # ReLU
         output = tf.nn.relu(output)
         # convolution
         output = slim.conv2d(output, out_features, kernel_size)
         # dropout(in case of training and in case it is no 1.0)
-        if is_training:
+        if training:
             output = slim.dropout(output, dropout_keep_prob)
     return output
 
-def bottleneck(_input, out_features, is_training = True, dropout_keep_prob = 0.8):
+def bottleneck(_input, out_features, training = True, dropout_keep_prob = 0.8):
     with tf.variable_scope("bottleneck"):
         inter_features = out_features * 4
-        output = slim.batch_norm(_input, is_training=self.is_training)#!!need op
+        output = slim.batch_norm(_input, is_training=training)#!!need op
         output = tf.nn.relu(output)
         output = slim.conv2d(_input, inter_features, [1,1], padding='VALID')
         if is_training:
             output = slim.dropout(output, dropout_keep_prob)
     return output
        
-def add_internal_layer(_input, growth_rate, is_training = True, bc_mode = False):
+def add_internal_layer(_input, growth_rate, training = True, bc_mode = False, dropout_keep_prob = 1.0):
         """Perform H_l composite function for the layer and after concatenate
         input with output from composite function.
         """
         # call composite function with 3x3 kernel
         if not bc_mode:
-            _output = composite_function(_input, growth_rate, is_training)
-            if is_training:
+            _output = composite_function(_input, growth_rate, training)
+            if training:
                 _output = slim.dropout(_output, dropout_keep_prob)
                 
         elif bc_mode:
             bottleneck_out = bottleneck(_input, growth_rate, is_training)
-            _output = composite_function(bottleneck_out, growth_rate, is_training)
-            if is_training:
+            _output = composite_function(bottleneck_out, growth_rate, training)
+            if training:
                 _output = slim.dropout(_output, dropout_keep_prob)
         
         # concatenate _input with out from composite function
         # the only diffenence between resnet and densenet
-        output = tf.concat(axis=3, values=(_input, _out))
+        output = tf.concat(axis=3, values=(_input, _output))
         return output
 
-def transition_layer(_input, num_filter, is_training = True, dropout_keep_prob = 0.8, reduction = 1.0):
+def transition_layer(_input, num_filter, training = True, dropout_keep_prob = 0.8, reduction = 1.0):
     """Call H_l composite function with 1x1 kernel and after average
     pooling
     """
     # call composite function with 1x1 kernel
     num_filter = int(num_filter * reduction)
-    _output = composite_function(_input, num_filter, [1,1])
-    if is_training:
+    _output = composite_function(_input, num_filter, training, kernel_size = [1,1])
+    if training:
         _output = slim.dropout(_output, dropout_keep_prob)
     _output = slim.avg_pool2d(_output, [2,2])
     return _output        
 
-def trainsition_layer_to_classes(_input, n_classes = 10, is_training = True):
-        """This is last transition to get probabilities by classes. It perform:
-        - batch normalization
-        - ReLU nonlinearity
-        - wide average pooling
-        - FC layer multiplication
-        """
-        _output = output = slim.batch_norm(_input, is_training=is_training)
-        #L.scale in caffe
-        _output = tf.nn.relu(_output)
-        last_pool_kernel = int(_output.get_shape()[-2])
-        _output = slim.avg_pool2d(_output, [last_pool_kernel, last_pool_kernel])
-        logits = slim.fully_connected(_output, n_classes)
-        return logits
+def trainsition_layer_to_classes(_input, n_classes = 10, training = True):
+    """This is last transition to get probabilities by classes. It perform:
+    - batch normalization
+    - ReLU nonlinearity
+    - wide average pooling
+    - FC layer multiplication
+    """
+    _output = output = slim.batch_norm(_input, is_training=training)
+    #L.scale in caffe
+    _output = tf.nn.relu(_output)
+    last_pool_kernel = int(_output.get_shape()[-2])
+    _output = slim.avg_pool2d(_output, [last_pool_kernel, last_pool_kernel])
+    logits = slim.fully_connected(_output, n_classes)
+    return logits
 
 
-def densenet_40(self, inputs,
+def densenet_40(inputs,
         first_output_features,
         layers_per_block,
         growth_rate,
@@ -241,45 +241,44 @@ def densenet_40(self, inputs,
     with tf.variable_scope(scope, 'densenet_40', [inputs]) as sc:
         # Collect outputs for conv2d, fully_connected and max_pool2d.
         end_points = {}
-        with slim.arg_scope([slim.conv2d, slim.max_pool2d]):
-            
-            #first conv
-            net = slim.conv2d(inputs, first_output_features, [3,3], scope="conv1")
-            end_points['conv1'] = net
-            
-            #block1
-            with tf.variable_scope("Block_1"):
-                for layer in range(layers_per_block):
-                    with tf.variable_scope("layer_%d" % layer):
-                        net = add_internal_layer(net, growth_rate, is_training, bc_mode)
-                        nchannels += growth_rate
-                with tf.variable_scope("Transition_1"):
-                        net = transition_layer(net, nchannels, is_training)
-            end_points['block1'] = net
-            
-            #block2
-            with tf.variable_scope("Block_2"):
-                for layer in range(layers_per_block):
-                    with tf.variable_scope("layer_%d" % layer):
-                        net = add_internal_layer(net, growth_rate, is_training, bc_mode)
-                        nchannels += growth_rate
-                with tf.variable_scope("Transition_2"):
-                        net = transition_layer(net, nchannels, is_training)
-            end_points['block2'] = net
-            
-            #block3
-            with tf.variable_scope("Block_3"):
-                for layer in range(layers_per_block):
-                    with tf.variable_scope("layer_%d" % layer):
-                        net = add_internal_layer(net, growth_rate, is_training, bc_mode)
-                        nchannels += growth_rate
-                        
-                with tf.variable_scope("trainsition_layer_to_classes"):
-                    net = trainsition_layer_to_classes(net, num_classes, is_training)
-            end_points['block3'] = net
-            
-            with tf.variable_scope("softmax"):
-                prediction = tf.nn.softmax(logits)
+        #first conv
+        net = slim.conv2d(inputs, first_output_features, [3,3], scope="conv1")
+        end_points['conv1'] = net
+        
+        #block1
+        with tf.variable_scope("Block_1"):
+            for layer in range(layers_per_block):
+                with tf.variable_scope("layer_%d" % layer):
+                    net = add_internal_layer(net, growth_rate, is_training, bc_mode, dropout_keep_prob)
+                    nchannels += growth_rate
+            with tf.variable_scope("Transition_1"):
+                    net = transition_layer(net, nchannels, is_training)
+        end_points['block1'] = net
+        
+        #block2
+        with tf.variable_scope("Block_2"):
+            for layer in range(layers_per_block):
+                with tf.variable_scope("layer_%d" % layer):
+                    net = add_internal_layer(net, growth_rate, is_training, bc_mode, dropout_keep_prob)
+                    nchannels += growth_rate
+            with tf.variable_scope("Transition_2"):
+                    net = transition_layer(net, nchannels, is_training)
+        end_points['block2'] = net
+        
+        #block3
+        with tf.variable_scope("Block_3"):
+            for layer in range(layers_per_block):
+                with tf.variable_scope("layer_%d" % layer):
+                    net = add_internal_layer(net, growth_rate, is_training, bc_mode, dropout_keep_prob)
+                    nchannels += growth_rate
+                    
+            with tf.variable_scope("trainsition_layer_to_classes"):
+                net = trainsition_layer_to_classes(net, num_classes, is_training)
+        end_points['block3'] = net
+        
+        #softmax
+        net = tf.reshape(net, [-1,num_classes])
+        prediction = tf.nn.softmax(net)
         
         return prediction, end_points
 

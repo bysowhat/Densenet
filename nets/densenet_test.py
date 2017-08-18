@@ -30,10 +30,13 @@ class DensenetTest(tf.test.TestCase):
     batch_size = 5
     height, width = 32, 32
     num_classes = 10
+    first_output_features = 4
+    layers_per_block = 12
+    growth_rate = 12
     with self.test_session():
       inputs = tf.random_uniform((batch_size, height, width, 3))
-      logits, _ = densenet.densenet_40(inputs, num_classes)
-      self.assertEquals(logits.op.name, 'vgg_a/fc8/squeezed')
+      logits, _ = densenet.densenet_40(inputs, first_output_features, layers_per_block, growth_rate)
+      self.assertEquals(logits.op.name, 'densenet_40/Softmax')
       self.assertListEqual(logits.get_shape().as_list(),
                            [batch_size, num_classes])
 
