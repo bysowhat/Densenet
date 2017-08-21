@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-r"""Downloads and converts a particular dataset.
+"""Downloads and converts a particular dataset.
 
 Usage:
 ```shell

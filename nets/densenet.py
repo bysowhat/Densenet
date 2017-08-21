@@ -273,14 +273,14 @@ def densenet_40(inputs,
                 with tf.variable_scope("trainsition_layer_to_classes"):
                     net = trainsition_layer_to_classes(net, num_classes, is_training)
             
-            
+            #(m,1,1,10) => (n,10)
+            logits = tf.reshape(net, [-1,num_classes])
             #softmax
-            net = tf.reshape(net, [-1,num_classes])
-            prediction = tf.nn.softmax(net)
+            #prediction = tf.nn.softmax(net)
             
             # Convert end_points_collection into a end_point dict.
             end_points = slim.utils.convert_collection_to_dict(end_points_collection)
-            return prediction, end_points
+            return logits, end_points
 
 
 def densenet_losses(logits, 

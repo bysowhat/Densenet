@@ -423,48 +423,48 @@ def main(_):
     # Create a dataset provider that loads data from the dataset #
     ##############################################################
     with tf.device(deploy_config.inputs_device()):
-      provider = slim.dataset_data_provider.DatasetDataProvider(
-          dataset,
-          num_readers=FLAGS.num_readers,
-          common_queue_capacity=20 * FLAGS.batch_size,
-          common_queue_min=10 * FLAGS.batch_size)
-      [image, label] = provider.get(['image', 'label'])
-      label -= FLAGS.labels_offset
+        provider = slim.dataset_data_provider.DatasetDataProvider(
+            dataset,
+            num_readers=FLAGS.num_readers,
+            common_queue_capacity=20 * FLAGS.batch_size,
+            common_queue_min=10 * FLAGS.batch_size)
+        [image, label] = provider.get(['image', 'label'])
+        label -= FLAGS.labels_offset
 
-      train_image_size = FLAGS.train_image_size or network_fn.default_image_size
+        train_image_size = FLAGS.train_image_size or network_fn.default_image_size
 
-      image = image_preprocessing_fn(image, train_image_size, train_image_size)
+        image = image_preprocessing_fn(image, train_image_size, train_image_size)#!!image summary?
 
-      images, labels = tf.train.batch(
-          [image, label],
-          batch_size=FLAGS.batch_size,
-          num_threads=FLAGS.num_preprocessing_threads,
-          capacity=5 * FLAGS.batch_size)
-      labels = slim.one_hot_encoding(
-          labels, dataset.num_classes - FLAGS.labels_offset)
-      batch_queue = slim.prefetch_queue.prefetch_queue(
-          [images, labels], capacity=2 * deploy_config.num_clones)
-
+        images, labels = tf.train.batch(
+            [image, label],
+            batch_size=FLAGS.batch_size,
+            num_threads=FLAGS.num_preprocessing_threads,
+            capacity=5 * FLAGS.batch_size)
+        labels = slim.one_hot_encoding(
+            labels, dataset.num_classes - FLAGS.labels_offset)
+        batch_queue = slim.prefetch_queue.prefetch_queue(
+            [images, labels], capacity=2 * deploy_config.num_clones)
+    
     ####################
     # Define the model #
     ####################
     def clone_fn(batch_queue):
-      """Allows data parallelism by creating multiple clones of network_fn."""
-      with tf.device(deploy_config.inputs_device()):
-        images, labels = batch_queue.dequeue()
-      logits, end_points = network_fn(images)
+        """Allows data parallelism by creating multiple clones of network_fn."""
+        with tf.device(deploy_config.inputs_device()):
+            images, labels = batch_queue.dequeue()
+            logits, end_points = network_fn(images)
 
-      #############################
-      # Specify the loss function #
-      #############################
-      if 'AuxLogits' in end_points:
+        #############################
+        # Specify the loss function #
+        #############################
+        if 'AuxLogits' in end_points:
+            tf.losses.softmax_cross_entropy(
+                logits=end_points['AuxLogits'], onehot_labels=labels,
+                label_smoothing=FLAGS.label_smoothing, weights=0.4, scope='aux_loss')
         tf.losses.softmax_cross_entropy(
-            logits=end_points['AuxLogits'], onehot_labels=labels,
-            label_smoothing=FLAGS.label_smoothing, weights=0.4, scope='aux_loss')
-      tf.losses.softmax_cross_entropy(
-          logits=logits, onehot_labels=labels,
-          label_smoothing=FLAGS.label_smoothing, weights=1.0)
-      return end_points
+            logits=logits, onehot_labels=labels,
+            label_smoothing=FLAGS.label_smoothing, weights=1.0)
+        return end_points
 
     # Gather initial summaries.
     summaries = set(tf.get_collection(tf.GraphKeys.SUMMARIES))
