@@ -253,6 +253,20 @@ def _configure_learning_rate(num_samples_per_epoch, global_step):
                                      power=1.0,
                                      cycle=False,
                                      name='polynomial_decay_learning_rate')
+  elif FLAGS.learning_rate_decay_type == 'densenetForCifar':
+    steps_one_epoch = int(num_samples_per_epoch/int(FLAGS.batch_size))
+    first_decay_step = steps_one_epoch * 150
+    second_decay_step = steps_one_epoch * 225
+    global_step_noref = tf.identity(global_step, "global_step_noref")
+    dtype = global_step_noref.dtype
+    first_decay_step_tensor = tf.convert_to_tensor(first_decay_step, dtype=dtype, name="first_decay_step_tensor")
+    second_decay_step_tensor = tf.convert_to_tensor(second_decay_step, dtype=dtype, name="second_decay_step_tensor")
+    boundaries = [first_decay_step_tensor, second_decay_step_tensor]
+    learn_rate = tf.convert_to_tensor(FLAGS.learning_rate, name="learning_rate")
+    values = [learn_rate, learn_rate/10.0, learn_rate/100.0]
+    return tf.train.piecewise_constant(global_step_noref,
+                                     boundaries,
+                                     values)
   else:
     raise ValueError('learning_rate_decay_type [%s] was not recognized',
                      FLAGS.learning_rate_decay_type)
@@ -296,6 +310,7 @@ def _configure_optimizer(learning_rate):
     optimizer = tf.train.MomentumOptimizer(
         learning_rate,
         momentum=FLAGS.momentum,
+        use_nesterov=True,
         name='Momentum')
   elif FLAGS.optimizer == 'rmsprop':
     optimizer = tf.train.RMSPropOptimizer(
@@ -433,7 +448,7 @@ def main(_):
 
         train_image_size = FLAGS.train_image_size or network_fn.default_image_size
 
-        image = image_preprocessing_fn(image, train_image_size, train_image_size)#!!image summary?
+        image = image_preprocessing_fn(image, train_image_size, train_image_size)
 
         images, labels = tf.train.batch(
             [image, label],
@@ -551,7 +566,11 @@ def main(_):
     # Merge all summaries together.
     summary_op = tf.summary.merge(list(summaries), name='summary_op')
 
-
+    mysaver = tf.train.Saver(max_to_keep=5,
+                               keep_checkpoint_every_n_hours=1.0,
+                               write_version=2,
+                               pad_step_number=False)
+    
     ###########################
     # Kicks off the training. #
     ###########################
@@ -566,6 +585,7 @@ def main(_):
         log_every_n_steps=FLAGS.log_every_n_steps,
         save_summaries_secs=FLAGS.save_summaries_secs,
         save_interval_secs=FLAGS.save_interval_secs,
+        saver=mysaver,
         sync_optimizer=optimizer if FLAGS.sync_replicas else None)
 
 
