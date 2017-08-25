@@ -1,4 +1,4 @@
-# DenseNet-tensorflow-slim
+# DenseNet tensorflow-slim
 This repository contains the slim(tensorflow) implementation for the paper [Densely Connected Convolutional Networks](http://arxiv.org/abs/1608.06993).There two types of `Densely Connected Convolutional Networks`  are available:
 
 - DenseNet - without bottleneck layers
@@ -18,7 +18,7 @@ Citation:
 
 ## Datasets
 
-The current version supports CIFAR-10 datasets. In order to be used for training a DENSENET model, the former need to be converted to TF-Records using the `download_and_convert_data.py` script(https://github.com/tensorflow/models/tree/master/slim)
+The current version supports CIFAR-10 datasets. In order to be used for training a DENSENET model, the former need to be converted to TF-Records using the `download_and_convert_data.py` script(https://github.com/tensorflow/models/tree/master/slim).
 
 ## Evaluation on Pascal VOC 2007
 
