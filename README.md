@@ -19,8 +19,9 @@ Citation:
 ## Datasets
 
 The current version supports CIFAR-10 datasets. In order to be used for training a DENSENET model, the former need to be converted to TF-Records using the `download_and_convert_data.py` script(https://github.com/tensorflow/models/tree/master/slim).
+The evaluation on Imagenet will be added soon.
 
-## Evaluation on Pascal VOC 2007
+## Evaluation on CIFAR-10
 
 The present TensorFlow implementation of Densenet models have the following performances:
 
