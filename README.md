@@ -1,5 +1,5 @@
 # DenseNet tensorflow-slim
-This repository contains the slim(tensorflow) implementation for the paper [Densely Connected Convolutional Networks](http://arxiv.org/abs/1608.06993).There two types of `Densely Connected Convolutional Networks`  are available:
+This repository contains the slim(tensorflow) implementation for the paper [Densely Connected Convolutional Networks](http://arxiv.org/abs/1608.06993).There are two types of `Densely Connected Convolutional Networks`  are available:
 
 - DenseNet - without bottleneck layers
 - DenseNet-BC - with bottleneck layers
