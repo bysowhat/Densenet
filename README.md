@@ -24,7 +24,7 @@ The current version supports CIFAR-10 datasets. In order to be used for training
 
 The present TensorFlow implementation of Densenet models have the following performances:
 
-| Model | Training data  | error |
+| Model | Dataset  | error |
 |--------|:---------:|:------:|
 | [DenseNet(k = 12)]| CIFAR-10 |  6.92 
 | [DenseNet-BC(k = 12)] | CIFAR-10 | 5.63
