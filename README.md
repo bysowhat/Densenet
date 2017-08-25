@@ -70,8 +70,7 @@ python train_ssd_network.py \
 Note that in addition to the training script flags, one may also want to experiment with data augmentation parameters (random cropping, resolution, ...) in `preprocessing/cifarnet_preprocessing.py`.
 
 The `num_clones` parameter can be set to change the number of model clones to deploy.
-
-In our experiment environment (cudnn v5.1, CUDA 7.5, one K40m GPU), the code runs with speed 1.5iters/s when batch size is set to be 64. The hyperparameters are identical to the original [torch implementation] (https://github.com/liuzhuang13/DenseNet).
+In our experiment environment (cudnn v5.1, CUDA 8.0, four K40m GPU), the code runs with speed 1.5iters/s when batch size is set to be 64. The hyperparameters are identical to the original [torch implementation] (https://github.com/liuzhuang13/DenseNet).
 
 
 ## Dependencies:
