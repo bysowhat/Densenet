@@ -467,7 +467,7 @@ def main(_):
         """Allows data parallelism by creating multiple clones of network_fn."""
         with tf.device(deploy_config.inputs_device()):
             images, labels = batch_queue.dequeue()
-            logits, end_points = network_fn(images)
+        logits, end_points = network_fn(images)
 
         #############################
         # Specify the loss function #
